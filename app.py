@@ -2,12 +2,18 @@
 
 import os
 import re
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask, jsonify, render_template
 
 APP_NAME = "LW_releaseGuard"
 DEFAULT_ENV_NAME = "production"
 DEFAULT_APP_VERSION = "1.0.0"
+
+# India Standard Time is a fixed UTC+05:30 with no daylight saving, so a static offset is exact
+# and avoids depending on the system tz database (absent from slim container images).
+IST = timezone(timedelta(hours=5, minutes=30), name="IST")
+IST_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S IST"
 
 # Strict MAJOR.MINOR.PATCH with no pre-release or build suffix (e.g. "1.4.2", not "1.4.2-rc1").
 _RELEASE_VERSION_PATTERN = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
@@ -37,6 +43,16 @@ def get_release_info():
     }
 
 
+def get_release_metadata():
+    """Build the release metadata: identity of the running build plus the current time in IST."""
+    return {
+        "app_name": APP_NAME,
+        "version": _read_env("APP_VERSION", DEFAULT_APP_VERSION),
+        "env": _read_env("ENV_NAME", DEFAULT_ENV_NAME),
+        "timestamp": datetime.now(IST).strftime(IST_TIMESTAMP_FORMAT),
+    }
+
+
 def is_release_ready(version):
     """A build is release-ready when its version is a final semantic version (no pre-release tag)."""
     return bool(_RELEASE_VERSION_PATTERN.match(version))
@@ -55,6 +71,11 @@ def health():
 @app.get("/release")
 def release():
     return jsonify(get_release_info())
+
+
+@app.get("/release/metadata")
+def release_metadata():
+    return jsonify(get_release_metadata())
 
 
 if __name__ == "__main__":

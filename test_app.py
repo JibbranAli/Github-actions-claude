@@ -1,3 +1,6 @@
+import re
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from app import DEFAULT_APP_VERSION, DEFAULT_ENV_NAME, app
@@ -151,6 +154,81 @@ def test_release_not_ready_for_prerelease_or_invalid_versions(client, monkeypatc
 
 def test_release_readiness_is_boolean(client):
     assert isinstance(client.get("/release").get_json()["release_readiness"], bool)
+
+
+# --- GET /release/metadata -----------------------------------------------
+
+METADATA_KEYS = {"app_name", "version", "env", "timestamp"}
+
+
+@pytest.fixture
+def frozen_utc_now(monkeypatch):
+    """Freeze app.datetime.now() at 2026-01-15 20:45:30 UTC, i.e. 2026-01-16 02:15:30 IST."""
+    fixed = datetime(2026, 1, 15, 20, 45, 30, tzinfo=timezone.utc)
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed.astimezone(tz) if tz else fixed
+
+    monkeypatch.setattr("app.datetime", FrozenDatetime)
+
+
+def test_release_metadata_returns_expected_keys(client):
+    response = client.get("/release/metadata")
+    assert response.status_code == 200
+    assert response.is_json
+    assert set(response.get_json()) == METADATA_KEYS
+
+
+def test_release_metadata_uses_defaults_when_env_missing(client):
+    data = client.get("/release/metadata").get_json()
+    assert data["app_name"] == "LW_releaseGuard"
+    assert data["version"] == DEFAULT_APP_VERSION
+    assert data["env"] == DEFAULT_ENV_NAME
+
+
+def test_release_metadata_uses_env_vars_when_present(client, monkeypatch):
+    monkeypatch.setenv("ENV_NAME", " staging ")
+    monkeypatch.setenv("APP_VERSION", "2.5.0-rc1")
+    data = client.get("/release/metadata").get_json()
+    assert data["env"] == "staging"
+    assert data["version"] == "2.5.0-rc1"
+
+
+def test_release_metadata_timestamp_format(client):
+    timestamp = client.get("/release/metadata").get_json()["timestamp"]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} IST", timestamp)
+    datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S IST")  # must also be a real date/time
+
+
+def test_release_metadata_timestamp_is_ist(client, frozen_utc_now):
+    # UTC+05:30 crosses midnight here, so this also checks the date rolls over correctly.
+    timestamp = client.get("/release/metadata").get_json()["timestamp"]
+    assert timestamp == "2026-01-16 02:15:30 IST"
+
+
+def test_release_metadata_timestamp_is_current(client):
+    before = datetime.now(timezone.utc).replace(microsecond=0)
+    timestamp = client.get("/release/metadata").get_json()["timestamp"]
+    after = datetime.now(timezone.utc)
+    reported = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S IST").replace(
+        tzinfo=timezone(timedelta(hours=5, minutes=30))
+    )
+    assert before <= reported <= after
+
+
+def test_release_metadata_rejects_post(client):
+    assert client.post("/release/metadata").status_code == 405
+
+
+def test_release_endpoint_unchanged_by_metadata_route(client):
+    assert set(client.get("/release").get_json()) == {
+        "app_name",
+        "version",
+        "env",
+        "release_readiness",
+    }
 
 
 # --- Misc ----------------------------------------------------------------
