@@ -1,0 +1,27 @@
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Version control and CI
+.git
+.gitignore
+.github
+
+# Local virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Editors and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Local secrets and docs not needed in the image
+.env
+.env.*
+README.md
+Dockerfile
+.dockerignore
