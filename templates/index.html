@@ -112,6 +112,7 @@
           <tr><td><a href="/"><code>GET /</code></a></td><td>This dashboard.</td></tr>
           <tr><td><a href="/health"><code>GET /health</code></a></td><td>Liveness check for load balancers and orchestrators. Returns <code>{"status": "healthy"}</code>.</td></tr>
           <tr><td><a href="/release"><code>GET /release</code></a></td><td>Release report as JSON: <code>app_name</code>, <code>version</code>, <code>env</code> and <code>release_readiness</code>.</td></tr>
+          <tr><td><a href="/release/metadata"><code>GET /release/metadata</code></a></td><td>Release metadata as JSON: <code>app_name</code>, <code>version</code>, <code>env</code> and the current <code>timestamp</code> in IST.</td></tr>
         </tbody>
       </table>
     </section>

@@ -9,10 +9,43 @@ LW_releaseGuard is a small Flask microservice that tells DevOps teams whether an
 | GET    | `/`        | HTML dashboard describing the service and the current release status |
 | GET    | `/health`  | `{"status": "healthy"}` |
 | GET    | `/release` | `{"app_name": "LW_releaseGuard", "version": "1.0.0", "env": "production", "release_readiness": true}` |
+| GET    | `/release/metadata` | `{"app_name": "LW_releaseGuard", "version": "1.0.0", "env": "production", "timestamp": "2026-10-21 14:05:09 IST"}` |
 
 ### Release readiness rule
 
 `release_readiness` is `true` when `APP_VERSION` is a final semantic version of the form `MAJOR.MINOR.PATCH` (for example `2.3.1`). Pre-release, build-tagged or malformed versions such as `2.3.1-rc1`, `2.3.1+build.7`, `v2.3.1`, `2.3` or `latest` are reported as not ready.
+
+### `GET /release/metadata`
+
+Returns metadata about the running build together with the server's current time in India Standard Time. Use it to stamp deployment logs, release notes or audit records, or to confirm which version is live in an environment and when it was checked.
+
+**Request**
+
+No parameters, request body or headers are required.
+
+```bash
+curl http://localhost:5000/release/metadata
+```
+
+**Response** (`200 OK`, `Content-Type: application/json`)
+
+```json
+{
+  "app_name": "LW_releaseGuard",
+  "version": "1.0.0",
+  "env": "production",
+  "timestamp": "2026-10-21 14:05:09 IST"
+}
+```
+
+| Field       | Type   | Description |
+|-------------|--------|-------------|
+| `app_name`  | string | Always `LW_releaseGuard` |
+| `version`   | string | Value of `APP_VERSION` (default `1.0.0`) |
+| `env`       | string | Value of `ENV_NAME` (default `production`) |
+| `timestamp` | string | Time the request was served, in IST (UTC+05:30), formatted `YYYY-MM-DD HH:MM:SS IST` |
+
+The timestamp is computed with a fixed UTC+05:30 offset from Python's standard library, so it is correct regardless of the host or container time zone and needs no extra dependencies. Unlike `/release`, this endpoint does not report `release_readiness`. Other methods such as `POST` return `405 Method Not Allowed`.
 
 ## Configuration
 
@@ -69,6 +102,7 @@ Then check it:
 ```bash
 curl http://localhost:5000/health
 curl http://localhost:5000/release
+curl http://localhost:5000/release/metadata
 ```
 
 Open http://localhost:5000/ in a browser for the dashboard.
